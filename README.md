@@ -1,4 +1,4 @@
-# lab2
+# Lab2
 VS WS15 lab2
 
 TODO: <br />
