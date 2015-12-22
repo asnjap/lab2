@@ -299,15 +299,36 @@ public class Client implements IClientCli, Runnable {
 							response = "Wrong number of arguments for !register!";
 						}
 						else{
-						String[] address = parts[1].split(":");
-						if(address.length!=2){
-							response = "Please give the address of form IP:Port";
-						}
-						else{
-						response = register(parts[1]);
-						}
+							String[] address = parts[1].split(":");
+							if(address.length!=2){
+								response = "Please give the address of form IP:Port";
+							}
+							else{
+								try{
+									if (privateSocket != null && !privateSocket.isClosed()) {
+										privateSocket.close();
+									}
+									privateSocket = new ServerSocket(Integer.parseInt(parts[1].split(":")[1]));
+									response = register(parts[1]);
+									if(response.contains("Sucessfully registered address")){
+										new PrivateListenerThread().start();
+									}
+									else{
+										privateSocket.close();
+										privateSocket = null;
+									}			
+								}
+								catch(IOException e){
+									if(e.getMessage().contains("already in use"))
+										response = "This address is already in use, please specify a new one";
+									else
+										response = e.getMessage();
+									
+								}
+							}
 						}
 					}
+					
 					if(input.startsWith("!lookup")){
 						String[] parts = input.split(" ");
 						if(parts.length != 2){
@@ -321,12 +342,27 @@ public class Client implements IClientCli, Runnable {
 						if(parts.length < 3){
 							response ="Wrong number of arguments for !msg";
 						}else{
-						String message = "";
-						for(int i = 2; i < parts.length; i++){
-							message += parts[i] + " ";
+							String message = "";
+							for(int i = 2; i < parts.length; i++){
+								message += parts[i] + " ";
+							}
+							
+							response = msg(parts[1], message);
+							
+							String address = lookup(parts[1]);
+							if(address.contains("Wrong username or user not reachable")||address.contains("You must log in first!")){
+								userResponseStream.println(address);
+							}
+							else {
+								String[] addr = address.split(":");
+								Socket cs = new Socket(addr[0], Integer.parseInt(addr[1]));
+								PrintWriter out = new PrintWriter(cs.getOutputStream(), true);
+								BufferedReader in = new BufferedReader(new InputStreamReader(cs.getInputStream()));
+								out.println(response + message);
+								response = parts[1] + " replied with " + in.readLine();
+								cs.close();
+							}	
 						}
-						
-						response = msg(parts[1], message);}
 					}
 					if(input.startsWith("!lastMsg")){
 						response = lastMsg();
@@ -366,7 +402,7 @@ public class Client implements IClientCli, Runnable {
 				try {
 					String msg = in.readLine();
 					if(msg!=null){
-						if(msg.startsWith("!public: ") || msg.startsWith("!private: ")){
+						if(msg.startsWith("!public: ")){
 							userResponseStream.println(msg);
 						}else{
 							msgQueue.put(msg);
@@ -391,6 +427,39 @@ public class Client implements IClientCli, Runnable {
 			}
 			shutdown = true;
 			System.err.println("Problem with connection. Shutting down client now...");
+		}
+	}
+	
+	private class PrivateListenerThread extends Thread {
+
+		public void run() {
+			while (true) {
+				Socket socket = null;
+				try {
+					socket = privateSocket.accept();
+					BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+					PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
+					
+					String request;
+					if ((request = reader.readLine()) != null) {
+						userResponseStream.println(request);
+						writer.println("!ack");
+					}
+
+				} catch (IOException e) {
+					System.err.println("Socket closed. Stop listening for connections.");
+					break;
+				} finally {
+					if (socket != null && !socket.isClosed())
+						try {
+							socket.close();
+						} catch (IOException e) {
+							// Ignored because we cannot handle it
+						}
+
+				}
+
+			}
 		}
 	}
 

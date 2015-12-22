@@ -108,16 +108,9 @@ public class ClientThread extends Thread {
 						if (currentUser == null)
 							response = "You must log in first!";
 						else {
-							if (currentUser.getAddress() != null) {
-								if (serverSocket != null && !serverSocket.isClosed()) {
-									serverSocket.close();
-								}
-							}
 							String[] parts = input.split(" ");
 							currentUser.setAddress(parts[1]);
 							response = "Sucessfully registered address for " + currentUser.getUsername();
-							serverSocket = new ServerSocket(Integer.parseInt(parts[1].split(":")[1]));
-							new PrivateListenerThread().start();
 
 						}
 					}
@@ -147,20 +140,14 @@ public class ClientThread extends Thread {
 							if (user == null || user.getAddress() == null) {
 								response = "Wrong username or user not reachable.";
 							} else {
-								String[] address = user.getAddress().split(":");
-								Socket cs = new Socket(address[0], Integer.parseInt(address[1]));
-								PrintWriter out = new PrintWriter(cs.getOutputStream(), true);
-								BufferedReader in = new BufferedReader(new InputStreamReader(cs.getInputStream()));
-								out.println("!private: " + currentUser.getUsername() + ": " + message);
-								response = user.getUsername() + " replied with " + in.readLine();
-								cs.close();
+								response = this.getCurrentUser().getUsername()+" :";
 							}
 						}
 					}
 					out.println(response);
 				}
 			} catch (IOException e) {
-				this.chatserver.getUserResponseStream().println("Closing client connection.");
+				this.chatserver.getUserResponseStream().println("Closing client connection: " + e.getMessage());
 				if(serverSocket != null && !serverSocket.isClosed()){
 					try {
 						serverSocket.close();
@@ -184,39 +171,6 @@ public class ClientThread extends Thread {
 
 	public void setLastMessage(String lastMessage) {
 		this.lastMessage = lastMessage;
-	}
-
-	private class PrivateListenerThread extends Thread {
-
-		public void run() {
-			while (true) {
-				Socket socket = null;
-				try {
-					socket = serverSocket.accept();
-					BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-					PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
-					
-					String request;
-					if ((request = reader.readLine()) != null) {
-						out.println(request);
-						writer.println("!ack");
-					}
-
-				} catch (IOException e) {
-					System.err.println("Socket closed. Stop listening for connections.");
-					break;
-				} finally {
-					if (socket != null && !socket.isClosed())
-						try {
-							socket.close();
-						} catch (IOException e) {
-							// Ignored because we cannot handle it
-						}
-
-				}
-
-			}
-		}
 	}
 
 }
