@@ -9,6 +9,7 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.security.InvalidKeyException;
 import java.security.Key;
+import java.security.MessageDigest;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -384,11 +385,9 @@ public class Client implements IClientCli, Runnable {
 								Key secretKey = getSecretKey();
 								Mac hmac = Mac.getInstance("HmacSHA256");
 								hmac.init(secretKey);
-								
 								byte[] hash = Base64.encode(hmac.doFinal(message.getBytes()));
-								
 								//
-								out.println(hash + response + message);
+								out.println(hash + ";" + response + message);
 								response = parts[1] + " replied with " + in.readLine();
 								cs.close();
 							}	
@@ -478,12 +477,39 @@ public class Client implements IClientCli, Runnable {
 					
 					String request;
 					if ((request = reader.readLine()) != null) {
-						userResponseStream.println(request);
-						writer.println("!ack");
+						
+						//Spliting input into part0=recievedHash and part1=user+message
+						String[] parts = request.split(";");
+						//Get recieved Hash from part0
+						byte [] recievedHash = parts[0].getBytes();
+						//Spliting part1 into part0 = user and part1 = message
+						String[] parts2 = parts[1].split(":");
+						
+						//Generating new Hash from message
+						Key secretKey = getSecretKey();
+						Mac hmac = Mac.getInstance("HmacSHA256");
+						hmac.init(secretKey);
+						byte[] newHash = Base64.encode(hmac.doFinal(parts2[1].getBytes()));
+						
+						if(MessageDigest.isEqual(newHash, recievedHash)) {
+							userResponseStream.println(request);
+							writer.println("!ack");
+						} else {
+							userResponseStream.println(request);
+							String responseMessage = "!tempered "+ parts2[1];
+							byte[] temperedHash = Base64.encode(hmac.doFinal(responseMessage.getBytes()));
+							writer.println(temperedHash + ";" + "Your message was tempered by a third user!");
+						}
 					}
 
 				} catch (IOException e) {
 					System.err.println("Socket closed. Stop listening for connections.");
+					break;
+				} catch (NoSuchAlgorithmException e) {
+					System.err.println("No such algorithm for HMAC: " + e.getMessage());
+					break;
+				} catch (InvalidKeyException e) {
+					System.err.println("Invalid secretKey: " + e.getMessage());
 					break;
 				} finally {
 					if (socket != null && !socket.isClosed())
