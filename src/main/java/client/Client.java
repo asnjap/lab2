@@ -1,21 +1,30 @@
 package client;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.PrintWriter;
+import java.security.InvalidKeyException;
+import java.security.Key;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import javax.crypto.Mac;
+
+import org.bouncycastle.util.encoders.Base64;
+
 import util.Config;
+import util.Keys;
 
 public class Client implements IClientCli, Runnable {
 
@@ -36,6 +45,7 @@ public class Client implements IClientCli, Runnable {
 	private int udpPortNumber;
 	private String host;
 	private boolean shutdown = false;
+	private Key secretKey;
 	
 	private BlockingQueue<String> msgQueue = new LinkedBlockingQueue<>();
 	
@@ -55,6 +65,13 @@ public class Client implements IClientCli, Runnable {
 		this.config = config;
 		this.userRequestStream = userRequestStream;
 		this.userResponseStream = userResponseStream;
+		
+		try {
+			this.secretKey = Keys.readSecretKey(new File(config
+					.getString("hmac.key")));
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 	@Override
@@ -193,6 +210,10 @@ public class Client implements IClientCli, Runnable {
 	
 	public PrintStream getUserResponseStream(){
 		return this.userResponseStream;
+	}
+	
+	protected Key getSecretKey() {
+		return this.secretKey;
 	}
 	
 	@Override
@@ -358,7 +379,16 @@ public class Client implements IClientCli, Runnable {
 								Socket cs = new Socket(addr[0], Integer.parseInt(addr[1]));
 								PrintWriter out = new PrintWriter(cs.getOutputStream(), true);
 								BufferedReader in = new BufferedReader(new InputStreamReader(cs.getInputStream()));
-								out.println(response + message);
+								
+								//maybe in a new method or not?
+								Key secretKey = getSecretKey();
+								Mac hmac = Mac.getInstance("HmacSHA256");
+								hmac.init(secretKey);
+								
+								byte[] hash = Base64.encode(hmac.doFinal(message.getBytes()));
+								
+								//
+								out.println(hash + response + message);
 								response = parts[1] + " replied with " + in.readLine();
 								cs.close();
 							}	
@@ -391,7 +421,13 @@ public class Client implements IClientCli, Runnable {
 				} catch (IOException e) {
 					System.err.println("Shutting down " + componentName + " now: " + e.getMessage());
 					break;
-				}
+				} catch (NoSuchAlgorithmException e) {
+					System.err.println("No such algorithm for HMAC: " + e.getMessage());
+					break;
+				} catch (InvalidKeyException e) {
+					System.err.println("Invalid secretKey: " + e.getMessage());
+					break;
+				} 
 			}
 		}
 	}
