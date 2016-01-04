@@ -385,10 +385,22 @@ public class Client implements IClientCli, Runnable {
 								Key secretKey = getSecretKey();
 								Mac hmac = Mac.getInstance("HmacSHA256");
 								hmac.init(secretKey);
-								byte[] hash = Base64.encode(hmac.doFinal(message.getBytes()));
+								String preparedMessage = "!msg " + message;
+								byte[] hash = Base64.encode(hmac.doFinal(preparedMessage.getBytes()));
 								//
 								out.println(hash + ";" + response + message);
-								response = parts[1] + " replied with " + in.readLine();
+								String inMessage = in.readLine();
+								if(inMessage.startsWith("!ack")) {
+									response = parts[1] + " replied with " + inMessage;
+								} else {
+									String[] parts2 = inMessage.split(";");
+									byte[] recievedHash = parts2[0].getBytes();
+									byte[] newHash = Base64.encode(hmac.doFinal(parts2[1].getBytes()));
+									if(!(MessageDigest.isEqual(newHash, recievedHash)) || parts2[1].equals("!tempered")) {
+										response = "Your message was tempered by a third user.";
+									}
+								}
+								
 								cs.close();
 							}	
 						}
@@ -489,16 +501,17 @@ public class Client implements IClientCli, Runnable {
 						Key secretKey = getSecretKey();
 						Mac hmac = Mac.getInstance("HmacSHA256");
 						hmac.init(secretKey);
-						byte[] newHash = Base64.encode(hmac.doFinal(parts2[1].getBytes()));
+						String preparedMessage = "!msg " + parts2[1];
+						byte[] newHash = Base64.encode(hmac.doFinal(preparedMessage.getBytes()));
 						
 						if(MessageDigest.isEqual(newHash, recievedHash)) {
-							userResponseStream.println(request);
+							userResponseStream.println(parts[1]);
 							writer.println("!ack");
 						} else {
-							userResponseStream.println(request);
+							userResponseStream.println(parts[1]);
 							String responseMessage = "!tempered "+ parts2[1];
 							byte[] temperedHash = Base64.encode(hmac.doFinal(responseMessage.getBytes()));
-							writer.println(temperedHash + ";" + "Your message was tempered by a third user!");
+							writer.println(temperedHash + ";" + "!tempered");
 						}
 					}
 
