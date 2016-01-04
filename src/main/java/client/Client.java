@@ -372,8 +372,8 @@ public class Client implements IClientCli, Runnable {
 							response = msg(parts[1], message);
 							
 							String address = lookup(parts[1]);
-							if(address.contains("Wrong username or user not reachable")||address.contains("You must log in first!")){
-								userResponseStream.println(address);
+							if(address.contains("No such domain.")||address.contains("User does not have a registered address.")||address.contains("You must log in first!")){
+								response = address;
 							}
 							else {
 								String[] addr = address.split(":");

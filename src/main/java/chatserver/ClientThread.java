@@ -9,6 +9,7 @@ import java.net.Socket;
 import java.rmi.RemoteException;
 import java.util.List;
 
+import nameserver.INameserverForChatserver;
 import nameserver.exceptions.AlreadyRegisteredException;
 import nameserver.exceptions.InvalidDomainException;
 
@@ -70,7 +71,7 @@ public class ClientThread extends Thread {
 							}
 							currentUser.setOnline(loggedIn);
 							if(!loggedIn)
-								currentUser.setAddress(null);
+								//currentUser.setAddress(null);
 							
 							if (serverSocket != null && !serverSocket.isClosed())
 								serverSocket.close();
@@ -113,7 +114,7 @@ public class ClientThread extends Thread {
 							response = "You must log in first!";
 						else {
 							String[] parts = input.split(" ");
-							currentUser.setAddress(parts[1]);
+							//currentUser.setAddress(parts[1]);
 							try {
 								chatserver.getRootNameserver().registerUser(currentUser.getUsername(), parts[1]);
 								response = "Sucessfully registered address for " + currentUser.getUsername();
@@ -133,11 +134,11 @@ public class ClientThread extends Thread {
 							response = "You must log in first!";
 						else {
 							String[] parts = input.split(" ");
-							User user = chatserver.getUser(parts[1]);
-							if (user == null || user.getAddress()== null)
-								response = "Wrong username or user not reachable";
-							else {
-								response = user.getAddress();
+							try{
+								response = lookup(parts[1]);
+							} catch(RemoteException e){
+								response = "Could not lookup the address: problem in "
+										+ "communication with the nameserver";
 							}
 						}
 					}
@@ -150,12 +151,7 @@ public class ClientThread extends Thread {
 							for (int i = 2; i < parts.length; i++) {
 								message += parts[i] + " ";
 							}
-							User user = chatserver.getUser(parts[1]);
-							if (user == null || user.getAddress() == null) {
-								response = "Wrong username or user not reachable.";
-							} else {
 								response = this.getCurrentUser().getUsername()+" :";
-							}
 						}
 					}
 					out.println(response);
@@ -173,6 +169,29 @@ public class ClientThread extends Thread {
 			}
 		}
 
+	}
+	
+	public String lookup(String username)throws RemoteException{
+		
+		String[] parts = username.split("\\.");
+		
+		INameserverForChatserver server = chatserver.getRootNameserver();
+		for(int i = (parts.length)-1; i >= 1; i--){
+			if(server != null){
+				server = server.getNameserver(parts[i]);
+			}else{
+				return "No such domain.";
+			}
+		}
+		if(server == null)
+			return "No such domain.";
+		
+		String result = server.lookup(parts[0]);
+		
+		if(result == null)
+			result = "User does not have a registered address.";
+		
+		return result;
 	}
 
 	public User getCurrentUser() {

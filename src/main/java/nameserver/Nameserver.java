@@ -250,14 +250,12 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 
 	@Override
 	public INameserverForChatserver getNameserver(String zone) throws RemoteException {
-		// TODO Auto-generated method stub
-		return null;
+		return zones.get(zone);
 	}
 
 	@Override
 	public String lookup(String username) throws RemoteException {
-		// TODO Auto-generated method stub
-		return null;
+		return addresses.get(username);
 	}
 
 	@Override
@@ -282,6 +280,11 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 				zones.get(parentDomain).registerNameserver(subdomain, nameserver, nameserverForChatserver);			
 				}
 			}
+	}
+	
+	@Override
+	public String toString(){
+		return domain;
 	}
 
 }
