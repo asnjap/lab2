@@ -51,6 +51,7 @@ public class Chatserver implements IChatserverCli, Runnable {
 		this.config = config;
 		this.userRequestStream = userRequestStream;
 		this.userResponseStream = userResponseStream;
+		initRMI();
 	}
 
 	@Override
@@ -65,21 +66,6 @@ public class Chatserver implements IChatserverCli, Runnable {
         
         //open sockets for TCP and UDP communication
 		config = new Config("chatserver");		
-		
-		try {
-			Registry registry = LocateRegistry.getRegistry(config.getString("registry.host"),
-					config.getInt("registry.port"));
-			rootNameserver = (INameserverForChatserver) registry.lookup(config
-					.getString("root_id"));
-		} catch (RemoteException e1) {
-			// TODO Auto-generated catch block
-			//what goes here?
-			e1.printStackTrace();
-		} catch (NotBoundException e) {
-			// TODO Auto-generated catch block
-			//what goes here?
-			e.printStackTrace();
-		}
 		
 		try {
 			serverSocket = new ServerSocket(config.getInt("tcp.port"));
@@ -120,6 +106,23 @@ public class Chatserver implements IChatserverCli, Runnable {
 				//highly unlikely
 			}
 			
+		}
+	}
+	
+	private void initRMI(){
+		try {
+			Registry registry = LocateRegistry.getRegistry(config.getString("registry.host"),
+					config.getInt("registry.port"));
+			rootNameserver = (INameserverForChatserver) registry.lookup(config
+					.getString("root_id"));
+		} catch (RemoteException e1) {
+			// TODO Auto-generated catch block
+			//what goes here?
+			e1.printStackTrace();
+		} catch (NotBoundException e) {
+			// TODO Auto-generated catch block
+			//what goes here?
+			e.printStackTrace();
 		}
 	}
 	

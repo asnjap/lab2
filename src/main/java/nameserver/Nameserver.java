@@ -41,7 +41,7 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 	private String domain;
 	private Registry registry;
 	private INameserver remote;
-	private ConcurrentHashMap<User, String> addresses = new ConcurrentHashMap<>();
+	private ConcurrentHashMap<String, String> addresses = new ConcurrentHashMap<>();
 	private ConcurrentHashMap<String, INameserver> zones = new ConcurrentHashMap<>();
 
 	/**
@@ -171,20 +171,15 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 	@Override
 	public String addresses() throws IOException {
 		
-		List<User> userList = new ArrayList<>();
+		List<String> userList = new ArrayList<>();
 		userList.addAll(addresses.keySet());
 		
-		Collections.sort(userList, new Comparator<User>() {
-	        @Override
-	        public int compare(final User object1, final User object2) {
-	            return object1.getUsername().compareTo(object2.getUsername());
-	        }
-	       } );
+		Collections.sort(userList);
 		
 		String result = "";
 		int i = 1;
-		for(User u: userList){
-			result += i + ". " + u.getUsername() + " " + addresses.get(u) + "\n";
+		for(String s: userList){
+			result += i + ". " + s + " " + addresses.get(s) + "\n";
 			i++;
 		}
 		return result;
@@ -231,8 +226,26 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 	@Override
 	public void registerUser(String username, String address)
 			throws RemoteException, AlreadyRegisteredException, InvalidDomainException {
-		// TODO Auto-generated method stub
 		
+		String[] parts = username.split("\\.");
+		
+		if(parts.length == 1){
+			this.addresses.put(parts[0], address);
+		}
+		
+		else{
+			String parentDomain = parts[parts.length-1];
+			if(!zones.containsKey(parentDomain))
+				throw new InvalidDomainException("The domain does not exist");
+			else{
+				String username1 = username.substring(0,username.lastIndexOf("."));
+				zones.get(parentDomain).registerUser(username1, address);			
+				}
+			}	
+	}
+	
+	public ConcurrentHashMap<String, String> getAddresses(){
+		return this.addresses;
 	}
 
 	@Override
