@@ -9,12 +9,17 @@ import java.io.PrintWriter;
 import java.net.DatagramSocket;
 import java.net.ServerSocket;
 import java.net.SocketException;
+import java.rmi.NotBoundException;
+import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
+import nameserver.INameserverForChatserver;
 import util.Config;
 
 public class Chatserver implements IChatserverCli, Runnable {
@@ -28,7 +33,7 @@ public class Chatserver implements IChatserverCli, Runnable {
 	private ConcurrentHashMap<String, User> users = new ConcurrentHashMap<>();
 	private TCPListenerThread tcpthread;
 	private UDPListenerThread udpthread;
-	
+	private INameserverForChatserver rootNameserver;
 
 	/**
 	 * @param componentName
@@ -60,6 +65,22 @@ public class Chatserver implements IChatserverCli, Runnable {
         
         //open sockets for TCP and UDP communication
 		config = new Config("chatserver");		
+		
+		try {
+			Registry registry = LocateRegistry.getRegistry(config.getString("registry.host"),
+					config.getInt("registry.port"));
+			rootNameserver = (INameserverForChatserver) registry.lookup(config
+					.getString("root_id"));
+		} catch (RemoteException e1) {
+			// TODO Auto-generated catch block
+			//what goes here?
+			e1.printStackTrace();
+		} catch (NotBoundException e) {
+			// TODO Auto-generated catch block
+			//what goes here?
+			e.printStackTrace();
+		}
+		
 		try {
 			serverSocket = new ServerSocket(config.getInt("tcp.port"));
 			datagramSocket = new DatagramSocket(config.getInt("udp.port"));
@@ -100,6 +121,10 @@ public class Chatserver implements IChatserverCli, Runnable {
 			}
 			
 		}
+	}
+	
+	public INameserverForChatserver getRootNameserver(){
+		return this.rootNameserver;
 	}
 	public User getUser(String username){
 		return users.get(username);

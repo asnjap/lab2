@@ -74,7 +74,6 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 
 	@Override
 	public void run() {
-		// TODO
 		
         BufferedReader userRequestReader = new BufferedReader(new InputStreamReader(userRequestStream));
         PrintWriter userResponseWriter = new PrintWriter(userResponseStream, true);

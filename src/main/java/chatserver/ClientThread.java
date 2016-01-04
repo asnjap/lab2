@@ -6,7 +6,11 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.rmi.RemoteException;
 import java.util.List;
+
+import nameserver.exceptions.AlreadyRegisteredException;
+import nameserver.exceptions.InvalidDomainException;
 
 public class ClientThread extends Thread {
 
@@ -110,7 +114,17 @@ public class ClientThread extends Thread {
 						else {
 							String[] parts = input.split(" ");
 							currentUser.setAddress(parts[1]);
-							response = "Sucessfully registered address for " + currentUser.getUsername();
+							try {
+								chatserver.getRootNameserver().registerUser(currentUser.getUsername(), parts[1]);
+								response = "Sucessfully registered address for " + currentUser.getUsername();
+							} catch (AlreadyRegisteredException e) {
+								response = "This address is already registered.";
+							} catch (InvalidDomainException e) {
+								// TODO Auto-generated catch block
+								response = "This domain is not valid.";
+							} catch(RemoteException e){
+								response = "Address cannot be registered: Cannot communicate with the nameserver" + e;
+							}		
 
 						}
 					}
