@@ -16,6 +16,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -47,6 +48,7 @@ public class Client implements IClientCli, Runnable {
 	private String host;
 	private boolean shutdown = false;
 	private Key secretKey;
+	private Mac hMac;
 	
 	private BlockingQueue<String> msgQueue = new LinkedBlockingQueue<>();
 	
@@ -71,6 +73,17 @@ public class Client implements IClientCli, Runnable {
 			this.secretKey = Keys.readSecretKey(new File(config
 					.getString("hmac.key")));
 		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		try {
+			this.hMac = Mac.getInstance("HmacSHA256");
+			this.hMac.init(this.secretKey);
+		} catch (InvalidKeyException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (NoSuchAlgorithmException e) {
+			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
@@ -211,6 +224,10 @@ public class Client implements IClientCli, Runnable {
 	
 	public PrintStream getUserResponseStream(){
 		return this.userResponseStream;
+	}
+	
+	protected Mac getHMAC() {
+		return this.hMac;
 	}
 	
 	protected Key getSecretKey() {
@@ -381,23 +398,22 @@ public class Client implements IClientCli, Runnable {
 								PrintWriter out = new PrintWriter(cs.getOutputStream(), true);
 								BufferedReader in = new BufferedReader(new InputStreamReader(cs.getInputStream()));
 								
-								//maybe in a new method or not?
-								Key secretKey = getSecretKey();
-								Mac hmac = Mac.getInstance("HmacSHA256");
-								hmac.init(secretKey);
+								
 								String preparedMessage = "!msg " + message;
-								byte[] hash = Base64.encode(hmac.doFinal(preparedMessage.getBytes()));
-								//
-								out.println(hash + ";" + response + message);
+								byte[] hash = Base64.encode(getHMAC().doFinal(preparedMessage.getBytes()));
+							    String hashToSend = new String(hash,StandardCharsets.UTF_8);		
+								out.println(hashToSend + ";" + response + message);
 								String inMessage = in.readLine();
-								if(inMessage.startsWith("!ack")) {
+								if(inMessage.equals("!ack")) {
 									response = parts[1] + " replied with " + inMessage;
 								} else {
 									String[] parts2 = inMessage.split(";");
-									byte[] recievedHash = parts2[0].getBytes();
-									byte[] newHash = Base64.encode(hmac.doFinal(parts2[1].getBytes()));
-									if(!(MessageDigest.isEqual(newHash, recievedHash)) || parts2[1].equals("!tempered")) {
-										response = "Your message was tempered by a third user.";
+									byte[] recievedHMAC = parts2[0].getBytes();
+									byte[] recievedHash = Base64.decode(recievedHMAC);
+									
+									byte[] newHash = getHMAC().doFinal(parts2[1].getBytes());
+									if(!(MessageDigest.isEqual(newHash, recievedHash)) || parts2[1].equals("!tampered")) {
+										response = "Your message was tampered by a third user.";
 									}
 								}
 								
@@ -432,13 +448,7 @@ public class Client implements IClientCli, Runnable {
 				} catch (IOException e) {
 					System.err.println("Shutting down " + componentName + " now: " + e.getMessage());
 					break;
-				} catch (NoSuchAlgorithmException e) {
-					System.err.println("No such algorithm for HMAC: " + e.getMessage());
-					break;
-				} catch (InvalidKeyException e) {
-					System.err.println("Invalid secretKey: " + e.getMessage());
-					break;
-				} 
+				}
 			}
 		}
 	}
@@ -493,36 +503,30 @@ public class Client implements IClientCli, Runnable {
 						//Spliting input into part0=recievedHash and part1=user+message
 						String[] parts = request.split(";");
 						//Get recieved Hash from part0
-						byte [] recievedHash = parts[0].getBytes();
+						byte [] recievedHMAC = parts[0].getBytes();
+						byte [] recievedHash = Base64.decode(recievedHMAC);
+						
 						//Spliting part1 into part0 = user and part1 = message
 						String[] parts2 = parts[1].split(":");
 						
 						//Generating new Hash from message
-						Key secretKey = getSecretKey();
-						Mac hmac = Mac.getInstance("HmacSHA256");
-						hmac.init(secretKey);
 						String preparedMessage = "!msg " + parts2[1];
-						byte[] newHash = Base64.encode(hmac.doFinal(preparedMessage.getBytes()));
-						
+						byte[] newHash = getHMAC().doFinal(preparedMessage.getBytes());
+						boolean equal = MessageDigest.isEqual(newHash, recievedHash);
 						if(MessageDigest.isEqual(newHash, recievedHash)) {
 							userResponseStream.println(parts[1]);
 							writer.println("!ack");
 						} else {
 							userResponseStream.println(parts[1]);
-							String responseMessage = "!tempered "+ parts2[1];
-							byte[] temperedHash = Base64.encode(hmac.doFinal(responseMessage.getBytes()));
-							writer.println(temperedHash + ";" + "!tempered");
+							String responseMessage = "!tampered "+ parts2[1];
+							byte[] tamperedHash = Base64.encode(getHMAC().doFinal(responseMessage.getBytes()));
+							String tamperedHashToSend = new String(tamperedHash, StandardCharsets.UTF_8);
+							writer.println(tamperedHashToSend + ";" + "!tampered");
 						}
 					}
 
 				} catch (IOException e) {
 					System.err.println("Socket closed. Stop listening for connections.");
-					break;
-				} catch (NoSuchAlgorithmException e) {
-					System.err.println("No such algorithm for HMAC: " + e.getMessage());
-					break;
-				} catch (InvalidKeyException e) {
-					System.err.println("Invalid secretKey: " + e.getMessage());
 					break;
 				} finally {
 					if (socket != null && !socket.isClosed())
