@@ -78,6 +78,7 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
         BufferedReader userRequestReader = new BufferedReader(new InputStreamReader(userRequestStream));
         PrintWriter userResponseWriter = new PrintWriter(userResponseStream, true);
         
+        
 		if(domain == null){
 			//nameserver is the root nameserver
 			try {
@@ -228,18 +229,21 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 			throws RemoteException, AlreadyRegisteredException, InvalidDomainException {
 		
 		String[] parts = username.split("\\.");
-		
+
 		if(parts.length == 1){
 			this.addresses.put(parts[0], address);
 		}
 		
 		else{
 			String parentDomain = parts[parts.length-1];
-			if(!zones.containsKey(parentDomain))
+			if(!isDomainValid(parentDomain)){
+				throw new InvalidDomainException("The domain may contain only alphabetic characters");
+			}
+			if(!zones.containsKey(parentDomain.toLowerCase()))
 				throw new InvalidDomainException("The domain does not exist");
 			else{
 				String username1 = username.substring(0,username.lastIndexOf("."));
-				zones.get(parentDomain).registerUser(username1, address);			
+				zones.get(parentDomain.toLowerCase()).registerUser(username1, address);			
 				}
 			}	
 	}
@@ -250,7 +254,7 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 
 	@Override
 	public INameserverForChatserver getNameserver(String zone) throws RemoteException {
-		return zones.get(zone);
+		return zones.get(zone.toLowerCase());
 	}
 
 	@Override
@@ -262,10 +266,12 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 	public void registerNameserver(String domain, INameserver nameserver,
 			INameserverForChatserver nameserverForChatserver)
 					throws RemoteException, AlreadyRegisteredException, InvalidDomainException {
+		if(!isDomainValid(domain))
+			throw new InvalidDomainException("Domain may contain only alphabetic characters");
 		
 		if(!domain.contains(".")){
-			if(!zones.containsKey(domain))
-				zones.put(domain, nameserver);
+			if(!zones.containsKey(domain.toLowerCase()))
+				zones.put(domain.toLowerCase(), nameserver);
 			else
 				throw new AlreadyRegisteredException("The domain already exists.");
 		}
@@ -273,18 +279,18 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 		else{
 			String[] parts = domain.split("\\.");
 			String parentDomain = parts[parts.length-1];
-			if(!zones.containsKey(parentDomain))
+			if(!zones.containsKey(parentDomain.toLowerCase()))
 				throw new InvalidDomainException("The parent domain does not exist");
 			else{
 				String subdomain = domain.substring(0,domain.lastIndexOf("."));
-				zones.get(parentDomain).registerNameserver(subdomain, nameserver, nameserverForChatserver);			
+				zones.get(parentDomain.toLowerCase()).registerNameserver(subdomain, nameserver, nameserverForChatserver);			
 				}
 			}
 	}
 	
-	@Override
-	public String toString(){
-		return domain;
+	private boolean isDomainValid(String domain){
+		    return domain.matches("[a-zA-Z]+(.[a-zA-Z]+)*");
 	}
+	
 
 }
