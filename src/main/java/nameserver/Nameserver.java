@@ -13,14 +13,14 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.MissingResourceException;
 import java.util.concurrent.ConcurrentHashMap;
 
-import chatserver.User;
+
 import nameserver.exceptions.AlreadyRegisteredException;
 import nameserver.exceptions.InvalidDomainException;
 import util.Config;
@@ -98,6 +98,8 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 			} catch(AlreadyBoundException e){
 				throw new RuntimeException("Error while binding remote object to registry.", e);
 			}
+			userResponseWriter.println(new Timestamp(System.currentTimeMillis()) + " : " + this.componentName + " is up!");
+			
 		}else{
 			INameserver rootServer;
 			try {
@@ -115,19 +117,23 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 			try {
 				//SETUP A CALLBACK OBJECT
 				remote = (INameserver) UnicastRemoteObject.exportObject(this, 0);
-		
+				userResponseWriter.println(new Timestamp(System.currentTimeMillis()) + " : " + "Registering nameserver for zone " + domain + "..." );
 				rootServer.registerNameserver(domain, remote, remote);
+				userResponseWriter.println(new Timestamp(System.currentTimeMillis()) + " : " + this.componentName + " is up!");
+				
 			} catch (RemoteException e) {
 				throw new RuntimeException(
 						"Error while registering.", e);
 			} catch (AlreadyRegisteredException e) {
 				userResponseWriter.println("This domain is already registered.");
+				throw new RuntimeException(); //or is it better to use return?
 			} catch (InvalidDomainException e) {
 				userResponseWriter.println("The requested domain is invalid");
+				throw new RuntimeException();//or is it better to use return?
 			}
 		}
 		
-		userResponseWriter.println("Nameserver: " + this.componentName + " is up!");
+		
 		
 		while(true){
 			try{
@@ -228,6 +234,8 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 	public void registerUser(String username, String address)
 			throws RemoteException, AlreadyRegisteredException, InvalidDomainException {
 		
+		loggingForChatserver();
+		
 		String[] parts = username.split("\\.");
 
 		if(parts.length == 1){
@@ -254,11 +262,13 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 
 	@Override
 	public INameserverForChatserver getNameserver(String zone) throws RemoteException {
+		loggingForChatserver();
 		return zones.get(zone.toLowerCase());
 	}
 
 	@Override
 	public String lookup(String username) throws RemoteException {
+		loggingForChatserver();
 		return addresses.get(username);
 	}
 
@@ -266,6 +276,8 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 	public void registerNameserver(String domain, INameserver nameserver,
 			INameserverForChatserver nameserverForChatserver)
 					throws RemoteException, AlreadyRegisteredException, InvalidDomainException {
+		
+		
 		if(!isDomainValid(domain))
 			throw new InvalidDomainException("Domain may contain only alphabetic characters");
 		
@@ -290,6 +302,14 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 	
 	private boolean isDomainValid(String domain){
 		    return domain.matches("[a-zA-Z]+(.[a-zA-Z]+)*");
+	}
+	
+	private void loggingForChatserver(){
+		
+		PrintWriter userResponseWriter = new PrintWriter(userResponseStream, true);
+		String dom = domain == null ? "root":domain;
+		userResponseWriter.println(new Timestamp(System.currentTimeMillis()) + " : Nameserver for '" + dom + "' requested by chatserver");
+		
 	}
 	
 

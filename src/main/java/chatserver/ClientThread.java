@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.util.List;
 
@@ -116,15 +117,16 @@ public class ClientThread extends Thread {
 							String[] parts = input.split(" ");
 							//currentUser.setAddress(parts[1]);
 							try {
-								chatserver.getRootNameserver().registerUser(currentUser.getUsername(), parts[1]);
-								response = "Sucessfully registered address for " + currentUser.getUsername();
-							} catch (AlreadyRegisteredException e) {
+									chatserver.getRootNameserver().registerUser(currentUser.getUsername(), parts[1]);
+									response = "Sucessfully registered address for " + currentUser.getUsername();
+							}
+							catch (AlreadyRegisteredException e) {
 								response = "This address is already registered.";
 							} catch (InvalidDomainException e) {
 								// TODO Auto-generated catch block
 								response = "This domain is not valid.";
-							} catch(RemoteException e){
-								response = "Address cannot be registered: Cannot communicate with the nameserver" + e;
+							} catch(RemoteException|NotBoundException e){
+								response = "Address cannot be registered: Cannot communicate with the nameserver";
 							}		
 
 						}
@@ -136,9 +138,8 @@ public class ClientThread extends Thread {
 							String[] parts = input.split(" ");
 							try{
 								response = lookup(parts[1]);
-							} catch(RemoteException e){
-								response = "Could not lookup the address: problem in "
-										+ "communication with the nameserver";
+							} catch(RemoteException|NotBoundException e){
+								response = "Could not lookup the address: Cannot communicate with the nameserver";
 							}
 						}
 					}
@@ -171,11 +172,14 @@ public class ClientThread extends Thread {
 
 	}
 	
-	public String lookup(String username)throws RemoteException{
+	public String lookup(String username)throws RemoteException, NotBoundException{
 		
 		String[] parts = username.split("\\.");
 		
-		INameserverForChatserver server = chatserver.getRootNameserver();
+		INameserverForChatserver server;
+		
+		server = chatserver.getRootNameserver();
+		
 		for(int i = (parts.length)-1; i >= 1; i--){
 			if(server != null){
 				server = server.getNameserver(parts[i]);
