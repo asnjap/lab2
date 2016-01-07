@@ -72,6 +72,7 @@ public class ClientThread extends Thread {
 							}
 							currentUser.setOnline(loggedIn);
 							if(!loggedIn)
+				
 								//currentUser.setAddress(null);
 							
 							if (serverSocket != null && !serverSocket.isClosed())

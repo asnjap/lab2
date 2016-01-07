@@ -107,32 +107,39 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 				rootServer = (INameserver) registry.lookup(rootID);
 				
 			} catch (RemoteException e) {
-				throw new RuntimeException(
-						"Error while obtaining registry/server-remote-object.", e);
+				userResponseWriter.println("An error while obtaining the registry/root nameserver remote object.");
+				return;
 			} catch (NotBoundException e) {
-				throw new RuntimeException(
-						"Error while looking for server-remote-object.", e);
+				userResponseWriter.println("Error while looking for nameserver remote object.");
+				return;
 			}
 			
-			try {
-				//SETUP A CALLBACK OBJECT
-				remote = (INameserver) UnicastRemoteObject.exportObject(this, 0);
-				userResponseWriter.println(new Timestamp(System.currentTimeMillis()) + " : " + "Registering nameserver for zone " + domain + "..." );
-				rootServer.registerNameserver(domain, remote, remote);
-				userResponseWriter.println(new Timestamp(System.currentTimeMillis()) + " : " + this.componentName + " is up!");
-				
-			} catch (RemoteException e) {
-				throw new RuntimeException(
-						"Error while registering.", e);
-			} catch (AlreadyRegisteredException e) {
-				userResponseWriter.println("This domain is already registered.");
-				throw new RuntimeException(); //or is it better to use return?
-			} catch (InvalidDomainException e) {
-				userResponseWriter.println("The requested domain is invalid");
-				throw new RuntimeException();//or is it better to use return?
+			try{
+				try {
+					//SETUP A CALLBACK OBJECT
+					remote = (INameserver) UnicastRemoteObject.exportObject(this, 0);
+					userResponseWriter.println(new Timestamp(System.currentTimeMillis()) + " : " + "Registering nameserver for zone " + domain + "..." );
+					rootServer.registerNameserver(domain, remote, remote);
+					userResponseWriter.println(new Timestamp(System.currentTimeMillis()) + " : " + this.componentName + " is up!");
+					
+				}catch (AlreadyRegisteredException e) {
+					userResponseWriter.println("This domain is already registered.");
+					exit();
+					return;
+				} catch (InvalidDomainException e) {
+					userResponseWriter.println("The requested domain is invalid");
+					exit();
+					return;
+				} catch (RemoteException e) {
+					userResponseWriter.println("An error occurred during the registration.");
+					exit();
+					return;
+				} 
+			}
+			catch(IOException e){
+				//wtf
 			}
 		}
-		
 		
 		
 		while(true){
@@ -202,17 +209,23 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 			System.err.println("Error while unexporting object: "
 					+ e.getMessage());
 		}
-
-		try {
-			// unbind the remote object so that a client can't find it anymore
-			registry.unbind(this.rootID);
-		} catch (Exception e) {
-			System.err.println("Error while unbinding object: "
-					+ e.getMessage());
+		
+		if(domain == null){
+			try {
+				// unbind the remote object so that a client can't find it anymore
+				registry.unbind(this.rootID);
+			} catch (Exception e) {
+				System.err.println("Error while unbinding object: "
+						+ e.getMessage());
+			}
+			UnicastRemoteObject.unexportObject(registry, true);
 		}
 		
-		if(domain == null)
-			UnicastRemoteObject.unexportObject(registry, true);
+        try{
+        	userRequestStream.close();
+        }catch(IOException e){
+        	//nothing can be done about it
+        }
 		
 		return "Sucessfully shutdown the nameserver: " + this.componentName;
 	}
@@ -291,11 +304,12 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 		else{
 			String[] parts = domain.split("\\.");
 			String parentDomain = parts[parts.length-1];
-			if(!zones.containsKey(parentDomain.toLowerCase()))
-				throw new InvalidDomainException("The parent domain does not exist");
-			else{
+			if(zones.containsKey(parentDomain.toLowerCase())){
 				String subdomain = domain.substring(0,domain.lastIndexOf("."));
 				zones.get(parentDomain.toLowerCase()).registerNameserver(subdomain, nameserver, nameserverForChatserver);			
+			}
+			else{
+				throw new InvalidDomainException("The parent domain does not exist");
 				}
 			}
 	}
