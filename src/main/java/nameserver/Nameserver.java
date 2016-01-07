@@ -137,7 +137,7 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 				} 
 			}
 			catch(IOException e){
-				//wtf
+				//highly unlikely
 			}
 		}
 		
@@ -193,6 +193,7 @@ public class Nameserver implements INameserverCli, Runnable, INameserver{
 		String result = "";
 		int i = 1;
 		for(String s: userList){
+			if(!addresses.get(s).equals(""))
 			result += i + ". " + s + " " + addresses.get(s) + "\n";
 			i++;
 		}

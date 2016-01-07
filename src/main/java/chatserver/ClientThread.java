@@ -4,7 +4,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
@@ -22,7 +21,6 @@ public class ClientThread extends Thread {
 	private PrintWriter out;
 	private User currentUser;
 	private List<ClientThread> clientThreads;
-	private ServerSocket serverSocket;
 	private String lastMessage = "No message received.";
 
 	public ClientThread(Socket clientSocket, Chatserver chatserver, List<ClientThread> clientThreads) {
@@ -71,12 +69,21 @@ public class ClientThread extends Thread {
 								}
 							}
 							currentUser.setOnline(loggedIn);
-							if(!loggedIn)
-				
-								//currentUser.setAddress(null);
+							if(!loggedIn && currentUser.isRegistered()){
+								try {
+									chatserver.getRootNameserver().registerUser(currentUser.getUsername(), "");
+								
+							}
+							catch (AlreadyRegisteredException e) {
+								response = "This address is already registered.";
+							} catch (InvalidDomainException e) {
+								// TODO Auto-generated catch block
+								response = "This domain is not valid.";
+							} catch(RemoteException|NotBoundException e){
+								response = "Address cannot be registered: Cannot communicate with the nameserver";
+							}
+							}
 							
-							if (serverSocket != null && !serverSocket.isClosed())
-								serverSocket.close();
 							response = "Successfully logged out!";
 							currentUser = null;
 							lastMessage = null;
@@ -128,7 +135,8 @@ public class ClientThread extends Thread {
 								response = "This domain is not valid.";
 							} catch(RemoteException|NotBoundException e){
 								response = "Address cannot be registered: Cannot communicate with the nameserver";
-							}		
+							}
+							currentUser.setRegistered(true);
 
 						}
 					}
@@ -160,13 +168,6 @@ public class ClientThread extends Thread {
 				}
 			} catch (IOException e) {
 				this.chatserver.getUserResponseStream().println("Closing client connection: " + e.getMessage());
-				if(serverSocket != null && !serverSocket.isClosed()){
-					try {
-						serverSocket.close();
-					} catch (IOException e1) {
-						//cant handle it
-					}
-				}
 				break;
 			}
 		}
@@ -193,7 +194,7 @@ public class ClientThread extends Thread {
 		
 		String result = server.lookup(parts[0]);
 		
-		if(result == null)
+		if(result == null || result.equals(""))
 			result = "User does not have a registered address.";
 		
 		return result;

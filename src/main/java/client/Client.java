@@ -318,6 +318,9 @@ public class Client implements IClientCli, Runnable {
 					}
 					
 					if(input.startsWith("!logout")){
+						if(privateSocket!=null && !privateSocket.isClosed()){
+							privateSocket.close();
+						}
 						response = logout();
 					}
 					
@@ -389,7 +392,7 @@ public class Client implements IClientCli, Runnable {
 							response = msg(parts[1], message);
 							
 							String address = lookup(parts[1]);
-							if(address.contains("No such domain.")||address.contains("User does not have a registered address.")||address.contains("You must log in first!")){
+							if(address.contains("No such domain.")||address.contains("User does not have a registered address.")||address.contains("You must log in first!")||address.contains("Cannot communicate")){
 								response = address;
 							}
 							else {
@@ -526,7 +529,7 @@ public class Client implements IClientCli, Runnable {
 					}
 
 				} catch (IOException e) {
-					System.err.println("Socket closed. Stop listening for connections.");
+					//System.err.println("Socket closed. Stop listening for connections.");
 					break;
 				} finally {
 					if (socket != null && !socket.isClosed())

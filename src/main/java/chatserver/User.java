@@ -4,6 +4,7 @@ public class User{
 	private String username;
 	private String password;
 	private boolean online;
+	private boolean registered;
 	
 	public User(){}
 	
@@ -25,6 +26,10 @@ public class User{
 		return this.online;
 	}
 	
+	public boolean isRegistered(){
+		return this.registered;
+	}
+	
 	public void setUsername(String username){
 		this.username = username;
 	}
@@ -35,6 +40,10 @@ public class User{
 	
 	public void setOnline(boolean online){
 		this.online = online;
+	}
+	
+	public void setRegistered(boolean registered){
+		this.registered = registered;
 	}
 	
 	@Override
